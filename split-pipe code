@@ -1,3 +1,5 @@
+### Processing the data from each sublibrary individually (using split-pipe --mode all)
+
 split-pipe \
     --mode all \
     --kit WT \
@@ -17,3 +19,13 @@ split-pipe \
     --sample SOR6 D1-D4 \
     --sample HC5 D5-D8 \
     --sample HC6 D9-D12
+
+
+### Combining the processed data from each sublibrary into a single dataset (using split-pipe --mode comb)
+
+split-pipe \
+--mode comb \
+--kit WT \
+--sublibraries /newvolume/analysis/20220123000_part1_lane1/HC1 /newvolume/analysis/20220123000_part1_lane1/HC2 /newvolume/analysis/20220123000_part1_lane1/HC3 /newvolume/analysis/20220123000_part1_lane1/HC4 /newvolume/analysis/20220123000_part1_lane1/HC5 /newvolume/analysis/20220123000_part1_lane1/HC6 \
+--output_dir /newvolume/analysis/20220123000_HC_comb \
+--genome_dir /newvolume/genomes/mm10/
