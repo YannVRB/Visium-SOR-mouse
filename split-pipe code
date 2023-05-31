@@ -1,0 +1,19 @@
+split-pipe \
+    --mode all \
+    --kit WT \
+    --fq1 /volume-general/analysis/customer/UIowa/Yann/fastq/S1_R1.fastq.gz \
+    --fq2 /volume-general/analysis/customer/UIowa/Yann/fastq/S1_R2.fastq.gz \
+    --output_dir  /volume-general/analysis/customer/UIowa/Yann/out \
+    --genome_dir /volume-general/genomes/refs-95/mm10/ \
+    --sample SOR1 A1-A4 \
+    --sample SOR2 A5-A8 \
+    --sample HC1 A9-A12 \
+    --sample HC2 B1-B4 \
+    --sample SOR3 B5-B8 \
+    --sample SOR4 B9-B12 \
+    --sample HC3 C1-C4 \
+    --sample HC4 C5-C8 \
+    --sample SOR5 C9-C12 \
+    --sample SOR6 D1-D4 \
+    --sample HC5 D5-D8 \
+    --sample HC6 D9-D12
