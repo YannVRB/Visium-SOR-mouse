@@ -6,7 +6,7 @@ Memory consolidation involves discrete patterns of transcriptional events in the
 
 
 
-This repository describes our SPLIT-seq analysis between HC and SOR conditions.
+This repository describes our SPLIT-seq and scATAC-seq analyses between HC and SOR conditions.
 
 The file "split-pipe code" contains the code used to run the split-pipe pipelien to pre-process the raw fastq files.
 
