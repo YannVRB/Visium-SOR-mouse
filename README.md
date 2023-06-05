@@ -1,3 +1,8 @@
 # SPLIT-seq-SOR-data-analysis
 
+This repository describes our SPLIT-seq analysis between HC and SOR conditions.
+
 ![image](https://github.com/YannVRB/SPLIT-seq-SOR-data-analysis/assets/69206510/18f9b9a1-cfbf-4a10-b1a0-00124eaf8dc7)
+
+
+![image](https://github.com/YannVRB/SPLIT-seq-SOR-data-analysis/assets/69206510/02b16c05-d7d1-4498-945f-1d20c05a806b)
