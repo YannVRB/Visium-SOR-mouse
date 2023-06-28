@@ -89,6 +89,7 @@ Idents(seur_obj) <- pbmc@meta.data$collapsed
 
 names(new_ids) <- levels(seur_obj)
 seur_obj <- RenameIdents(seur_obj, new_ids)
+saveRDS(seur_obj, file = "seur_obj.rds")
 
 #Differential gene expression analysis in Oligodendrocytes
 seur_obj$celltype.sample_category <- paste(Idents(seur_obj), seur_obj$sample_category, sep = "_")
