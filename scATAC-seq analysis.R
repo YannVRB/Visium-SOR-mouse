@@ -181,18 +181,57 @@ SOR_seuratobject <- NormalizeData(
   scale.factor = median(SOR_seuratobject$nCount_RNA)
 )
 
+# Add dataset-identifying metadata for the two conditions homecage (HC) and Spatial Object Recognition (SOR).
+HC_seuratobject$dataset <- "HC"
+SOR_seuratobject$dataset <- "SOR"
+
+#Merge
+combined <- merge(HC_seuratobject, SOR_seuratobject)
+#Process the combined dataset
+combined <- FindTopFeatures(combined, min.cutoff = 10)
+combined <- RunTFIDF(combined)
+combined <- RunSVD(combined)
+combined <- RunUMAP(combined, reduction = "lsi", dims = 2:30)
+#Check if all clusters overlap in the 2D UMAP space. If there are no individual cluster of cells that present in one condition and not the other then skip the integration step.
+DimPlot(combined, group.by = "dataset")
+
+#Integration
+#Find integration anchors
+integration.anchors <- FindIntegrationAnchors(
+  object.list = list(HC_seuratobject, SOR_seuratobject),
+  anchor.features = rownames(HC_seuratobject),
+  reduction = "rlsi",
+  dims = 2:30
+)
+#Integrate LSI embeddings.
+integrated <- IntegrateEmbeddings(
+  anchorset = integration.anchors,
+  reductions = combined[["lsi"]],
+  new.reduction.name = "integrated_lsi",
+  dims.to.integrate = 1:30,
+  k.weight = 10
+)
+#Create a new UMAP using the integrated embeddings.
+integrated <- RunUMAP(integrated, reduction = "integrated_lsi", dims = 2:30)
+#All clusters should overlap in the 2D UMAP space between HC and SOR conditions.
+DimPlot(integrated, group.by = "dataset")
+
+#Annotating cell types
+#Switch to the gene activity matrix previously computed.
+DefaultAssay(HC_seuratobject) <- 'RNA'
 DefaultAssay(SOR_seuratobject) <- 'RNA'
 
-#Integrating with scRNA-seq data.
+#Transfer labels of previously identified cell types from HC samples of the SPLIT-seq data.
 #Load the pre-processed scRNA-seq data.
-allen_rna <- readRDS("allen_brain.rds")
-allen_rna <- FindVariableFeatures(
-  object = allen_rna,
-  nfeatures = 5000
-)
+seur_objSPLITseq <- readRDS("seur_obj.rds")
+#Identify the indices of the cells corresponding to the "HC" category using the which() function.
+hc_indices <- which(seur_obj$sample_category == "HC")
+#Create a new Seurat object containing only the "HC" cells using the subset() function.
+hc_seur_obj <- subset(seur_obj, cells = hc_indices)
 
+#Transfer cell type labels from reference to query
 transfer.anchors <- FindTransferAnchors(
-  reference = allen_rna,
+  reference = hc_seur_obj,
   query = HC_seuratobject,
   reduction = 'cca',
   dims = 1:40
@@ -204,61 +243,6 @@ predicted.labelsHC <- TransferData(
   weight.reduction = HC_seuratobject[['lsi']],
   dims = 2:30
 )
-
-HC_seuratobject <- AddMetaData(object = HC_seuratobject, metadata = predicted.labelsHC)
-
-plot1 <- DimPlot(allen_rna, group.by = 'subclass', label = TRUE, repel = TRUE) + NoLegend() + ggtitle('scRNA-seq')
-plot2 <- DimPlot(HC_seuratobject, group.by = 'predicted.id', label = TRUE, repel = TRUE) + NoLegend() + ggtitle('scATAC-seq')
-plot1 + plot2
-
-DefaultAssay(HC_seuratobject) <- 'peaks'
-
-CoveragePlot(
-  object = HC_seuratobject,
-  region = c("Nr4a2"),
-  extend.upstream = 1000,
-  extend.downstream = 1000,
-  ncol = 1,
-  ymax = 36
-)
-
-DefaultAssay(SOR_seuratobject) <- 'peaks'
-
-CoveragePlot(
-  object = SOR_seuratobject,
-  region = c("Nr4a2"),
-  extend.upstream = 1000,
-  extend.downstream = 1000,
-  ncol = 1
-)
-
-HC_seuratobject$dataset <- "HC"
-SOR_seuratobject$dataset <- "SOR"
-
-combined <- merge(HC_seuratobject, SOR_seuratobject)
-
-combined <- FindTopFeatures(combined, min.cutoff = 10)
-combined <- RunTFIDF(combined)
-combined <- RunSVD(combined)
-combined <- RunUMAP(combined, reduction = "lsi", dims = 2:30)
-p1 <- DimPlot(combined, group.by = "dataset")
-
-integration.anchors <- FindIntegrationAnchors(
-  object.list = list(HC_seuratobject, SOR_seuratobject),
-  anchor.features = rownames(HC_seuratobject),
-  reduction = "rlsi",
-  dims = 2:30
-)
-
-integrated <- IntegrateEmbeddings(
-  anchorset = integration.anchors,
-  reductions = combined[["lsi"]],
-  new.reduction.name = "integrated_lsi",
-  dims.to.integrate = 1:30,
-  k.weight = 10
-)
-
-integrated <- RunUMAP(integrated, reduction = "integrated_lsi", dims = 2:30)
 
 #Adding gene annotations to the seurat object for the mouse genome. This will allow downstream functions to pull the gene annotation information directly from the object.
 annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Mmusculus.v79)
