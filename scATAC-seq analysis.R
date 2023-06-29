@@ -232,17 +232,19 @@ hc_seur_obj <- subset(seur_obj, cells = hc_indices)
 #Transfer cell type labels from reference to query
 transfer.anchors <- FindTransferAnchors(
   reference = hc_seur_obj,
-  query = HC_seuratobject,
+  query = integrated,
   reduction = 'cca',
   dims = 1:40
 )
 
 predicted.labelsHC <- TransferData(
   anchorset = transfer.anchors,
-  refdata = allen_rna$subclass,
-  weight.reduction = HC_seuratobject[['lsi']],
+  refdata = hc_seur_obj@active.ident,
+  weight.reduction = integrated[['lsi']],
   dims = 2:30
 )
+
+integrated <- AddMetaData(object = integrated, metadata = predicted.labelsHC)
 
 #Adding gene annotations to the seurat object for the mouse genome. This will allow downstream functions to pull the gene annotation information directly from the object.
 annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Mmusculus.v79)
