@@ -186,7 +186,11 @@ HC_seuratobject$dataset <- "HC"
 SOR_seuratobject$dataset <- "SOR"
 
 #Merge
-combined <- merge(HC_seuratobject, SOR_seuratobject)
+combined <- merge(
+  x = HC1_seuratobject_switchtoSOR,
+  y = list(HC2_seuratobject_switchtoSOR, HC7_seuratobject, HC8_seuratobject, SOR1_seuratobject_switchtoHC, SOR2_seuratobject_switchtoHC, SOR5_seuratobject, SOR6_seuratobject),
+  add.cell.ids = c("HC1", "HC2", "HC7", "HC8", "SOR1", "SOR2", "SOR5", "SOR6")
+)
 #Process the combined dataset
 combined <- FindTopFeatures(combined, min.cutoff = 10)
 combined <- RunTFIDF(combined)
@@ -195,31 +199,21 @@ combined <- RunUMAP(combined, reduction = "lsi", dims = 2:30)
 #Check if all clusters overlap in the 2D UMAP space. If there are no individual cluster of cells that present in one condition and not the other then skip the integration step.
 DimPlot(combined, group.by = "dataset")
 
-#Integration
-#Find integration anchors
-integration.anchors <- FindIntegrationAnchors(
-  object.list = list(HC_seuratobject, SOR_seuratobject),
-  anchor.features = rownames(HC_seuratobject),
-  reduction = "rlsi",
-  dims = 2:30
+#Create a gene activity matrix 2000bp before and after the transcription start site of each gene.
+gene.activities <- GeneActivity(combined, extend.upstream = 2000, extend.downstream = 2000)
+#Add the gene activity matrix to the Seurat object as a new assay
+combined[['RNA']] <- CreateAssayObject(counts = gene.activities)
+#LogNormalize the new assay
+combined <- NormalizeData(
+  object = combined,
+  assay = 'RNA',
+  normalization.method = 'LogNormalize',
+  scale.factor = median(combined$nCount_RNA)
 )
-#Integrate LSI embeddings.
-integrated <- IntegrateEmbeddings(
-  anchorset = integration.anchors,
-  reductions = combined[["lsi"]],
-  new.reduction.name = "integrated_lsi",
-  dims.to.integrate = 1:30,
-  k.weight = 10
-)
-#Create a new UMAP using the integrated embeddings.
-integrated <- RunUMAP(integrated, reduction = "integrated_lsi", dims = 2:30)
-#All clusters should overlap in the 2D UMAP space between HC and SOR conditions.
-DimPlot(integrated, group.by = "dataset")
 
 #Annotating cell types
 #Switch to the gene activity matrix previously computed.
-DefaultAssay(HC_seuratobject) <- 'RNA'
-DefaultAssay(SOR_seuratobject) <- 'RNA'
+DefaultAssay(combined) <- 'RNA'
 
 #Transfer labels of previously identified cell types from HC samples of the SPLIT-seq data.
 #Load the pre-processed scRNA-seq data.
@@ -232,7 +226,7 @@ hc_seur_obj <- subset(seur_obj, cells = hc_indices)
 #Transfer cell type labels from reference to query
 transfer.anchors <- FindTransferAnchors(
   reference = hc_seur_obj,
-  query = integrated,
+  query = combined,
   reduction = 'cca',
   dims = 1:40
 )
@@ -240,37 +234,47 @@ transfer.anchors <- FindTransferAnchors(
 predicted.labelsHC <- TransferData(
   anchorset = transfer.anchors,
   refdata = hc_seur_obj@active.ident,
-  weight.reduction = integrated[['lsi']],
+  weight.reduction = combined[['lsi']],
   dims = 2:30
 )
 
-integrated <- AddMetaData(object = integrated, metadata = predicted.labelsHC)
+combined <- AddMetaData(object = combined, metadata = predicted.labelsHC)
+
+#Replace each label with its most likely prediction
+for(i in levels(combined)) {
+  cells_to_reid <- WhichCells(combined, idents = i)
+  newid <- names(sort(table(combined$predicted.id[cells_to_reid]),decreasing=TRUE))[1]
+  Idents(combined, cells = cells_to_reid) <- newid
+}
+
+#Visualize clusters identification
+DimPlot(combined, label = TRUE, repel = TRUE) + NoLegend()
 
 #Adding gene annotations to the seurat object for the mouse genome. This will allow downstream functions to pull the gene annotation information directly from the object.
 annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Mmusculus.v79)
 seqlevelsStyle(annotations) <- 'UCSC'
 genome(annotations) <- "mm10"
-Annotation(integrated) <- annotations
+Annotation(combined) <- annotations
 
 #Find differentially accessible promoter between condition for a specific cell type.
 #Change back to working with peaks instead of gene activities.
-DefaultAssay(integrated) <- 'peaks'
+DefaultAssay(combined) <- 'peaks'
 #Formatting labels for differential analysis.
-integrated$celltype.dataset <- paste(Idents(integrated), integrated$dataset, sep = "_")
-integrated$celltype <- Idents(integrated)
-Idents(integrated) <- "celltype.dataset"
-#Perform the differential analysis in Oligodendrocytes.
+combined$celltype.dataset <- paste(Idents(combined), combined$dataset, sep = "_")
+combined$celltype <- Idents(combined)
+Idents(combined) <- "celltype.dataset"
+#Perform the differential analysis in Oligodendrocytes. Make sure to be in the RNA assay.
 da_peaks_oligo <- FindMarkers(
-  object = integrated,
+  object = combined,
   ident.1 = "Oligodendrocytes_SOR",
   ident.2 = "Oligodendrocytes_HC",
   test.use = 'LR',
   latent.vars = 'nCount_peaks'
 )
 
-#Example coverage plot for the gene Sgk1.
+#Example coverage plot for the gene Sgk1 with a zoom around its promoter region. Make sure to be in the peaks assay.
 sgk1CoveragePlot <- CoveragePlot(
-  object = integrated,
+  object = combined,
   region = c("Sgk1"),
   extend.upstream = 2000,
   extend.downstream = -113000)
