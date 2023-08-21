@@ -1,5 +1,6 @@
 ### Processing the data from each sublibrary individually (using split-pipe --mode all)
 
+#Example for S1
 split-pipe \
     --mode all \
     --kit WT \
